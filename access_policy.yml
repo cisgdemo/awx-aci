@@ -1,0 +1,42 @@
+- hosts: apic
+  connection: local
+  gather_facts: no
+
+  vars:
+    apic_info: &apic_info
+      host:           "{{ ansible_host }}" 
+      user:           "{{ ansible_user }}" 
+      password:       "{{ ansible_password }}" 
+      validate_certs: "{{ validate_certs }}"
+      use_ssl:        "{{ use_ssl }}"
+    
+    var_state: &var_state
+      state: "{{ state_all if state_all is defined else item.state if item.state is defined else 'present' }}"
+
+  vars_files: access_policy_vars.yml
+
+
+  tasks:
+  - name: Import CSV
+    community.general.read_csv:
+      path: excel-csv.csv
+    register: excel
+    delegate_to: localhost
+
+  - name: display user_list data
+    debug:
+      var: item.name
+      var: item.alloc_mode
+      var: item.index
+    with_items: "{{ excel.list }}"
+
+  # Fabric > Access Policies > Pools > VLAN
+  - name: Task1 - VLAN pool
+    cisco.aci.aci_vlan_pool:
+      <<: *apic_info
+      <<: *var_state
+      pool:                 "{{ item.name }}"
+      pool_allocation_mode: "{{ item.alloc_mode }}"
+    with_items: "{{ excel.list }}"
+    #loop: "{{ vlan_pools }}"
+    tags: accp-task1, vlan_pool
